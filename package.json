@@ -1,0 +1,23 @@
+{
+    "name": "gameqa-workspace",
+    "private": true,
+    "scripts": {
+        "build": "pnpm -r build",
+        "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+        "fix": "pnpm format && pnpm lint:fix",
+        "lint": "oxlint .",
+        "lint:fix": "oxlint . --fix",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
+        "format": "oxfmt . --write",
+        "format:check": "oxfmt . --check"
+    },
+    "devDependencies": {
+        "@types/node": "^24.13.2",
+        "oxfmt": "^0.55.0",
+        "oxlint": "^1.70.0",
+        "typescript": "^6.0.3",
+        "vitest": "^4.1.9"
+    },
+    "packageManager": "pnpm@11.7.0"
+}

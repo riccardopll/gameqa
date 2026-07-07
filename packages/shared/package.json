@@ -1,0 +1,14 @@
+{
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "tsdown",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "zod": "^4.1.13"
+    },
+    "devDependencies": {
+        "tsdown": "^0.22.3"
+    }
+}
