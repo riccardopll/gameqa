@@ -1,42 +1,42 @@
 name: Publish browser runner
 
 on:
-    push:
-        branches:
-            - main
+  push:
+    branches:
+      - main
 
 concurrency:
-    group: publish-runner-${{ github.ref }}
-    cancel-in-progress: true
+  group: publish-runner-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-    contents: read
-    packages: write
+  contents: read
+  packages: write
 
 env:
-    IMAGE: ghcr.io/riccardopll/gameqa-browser-runner
+  IMAGE: ghcr.io/riccardopll/gameqa-browser-runner
 
 jobs:
-    publish:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v5
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
 
-            - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@v4
 
-            - uses: docker/login-action@v4
-              with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            - uses: docker/build-push-action@v6
-              with:
-                  context: .
-                  file: packages/browser-runner/Dockerfile
-                  platforms: linux/amd64
-                  push: true
-                  tags: ${{ env.IMAGE }}:latest
-                  labels: |
-                      org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-                      org.opencontainers.image.revision=${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/browser-runner/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}

@@ -1,7 +1,7 @@
 {
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "typecheck": "tsc --noEmit"
-    }
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
 }
