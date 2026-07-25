@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A deliberately buggy shop instrumented with the GameQA SDK."
+    />
+    <title>Ember Shop — GameQA demo</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">GAMEQA DEMO FIXTURE</p>
+        <h1>Ember Shop</h1>
+        <p>
+          Buy supplies before entering the cavern. The merchant should reject unaffordable
+          purchases.
+        </p>
+      </header>
+
+      <section class="game" aria-label="Ember Shop game">
+        <div class="stats" aria-live="polite">
+          <span>Gold <strong id="gold">0</strong></span>
+          <span>Flasks <strong id="flasks">0</strong></span>
+          <span>Turns <strong id="turns">0</strong></span>
+        </div>
+        <div class="merchant" aria-hidden="true">🔥</div>
+        <p id="message" class="message">The merchant offers an ember flask for 5 gold.</p>
+        <div class="actions">
+          <button id="buy" type="button">Buy flask · 5 gold</button>
+          <button id="explore" type="button">Search the counter</button>
+          <button id="reset" type="button">Reset shop</button>
+        </div>
+      </section>
+
+      <aside>
+        <strong>Purposefully broken:</strong> the buy action is offered with zero gold and creates a
+        negative balance.
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

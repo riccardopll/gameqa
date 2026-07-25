@@ -10,24 +10,32 @@ export type JsonValue =
 
 export type JsonRecord = Record<string, JsonValue>;
 
-export type AgentAdapter = "codex";
+export type AgentAdapter = "pi";
+
+export type PiThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export type Config = {
   run: {
     outputDir: string;
     maxTurns: number;
     timeoutSeconds: number;
+    agentTimeoutSeconds: number;
+    settleMs: number;
   };
   agents: Array<{
     id: string;
     adapter: AgentAdapter;
     persona: string;
+    provider?: string;
+    model?: string;
+    thinking?: PiThinkingLevel;
   }>;
 };
 
 export type LocalSession = {
   sessionId: string;
   apiUrl: string;
+  authToken: string;
 };
 
 export type GamePhase = "agent_turn" | "running" | "waiting" | "complete" | "failed";
@@ -101,10 +109,12 @@ export type ScreenEvidence = {
 export type RunnerJob = {
   runId: string;
   sessionId: string;
+  authToken: string;
   targetUrl: string;
   bridgeUrl: string;
   maxTurns: number;
   timeoutSeconds: number;
+  settleMs: number;
   workDir: string;
 };
 
@@ -143,6 +153,7 @@ export type RunnerComplete = {
   runId: string;
   sessionId: string;
   status: "completed" | "failed";
+  stopReason: "agent_finish" | "max_turns" | "timeout" | "failed";
   error?: string;
   metrics: {
     durationSeconds: number;
@@ -180,7 +191,17 @@ export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
 
 export const jsonRecordSchema = z.record(z.string(), jsonValueSchema);
 
-export const agentAdapterSchema = z.literal("codex");
+export const agentAdapterSchema = z.literal("pi");
+
+export const piThinkingLevelSchema = z.enum([
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+]);
 
 export const configSchema = z.object({
   run: z
@@ -188,11 +209,15 @@ export const configSchema = z.object({
       outputDir: z.string().min(1).default(".gameqa/runs"),
       maxTurns: z.number().int().min(1).max(100).default(20),
       timeoutSeconds: z.number().int().min(10).max(7200).default(300),
+      agentTimeoutSeconds: z.number().int().min(10).max(1800).default(120),
+      settleMs: z.number().int().min(0).max(10000).default(250),
     })
     .default({
       outputDir: ".gameqa/runs",
       maxTurns: 20,
       timeoutSeconds: 300,
+      agentTimeoutSeconds: 120,
+      settleMs: 250,
     }),
   agents: z
     .array(
@@ -200,6 +225,9 @@ export const configSchema = z.object({
         id: z.string().min(1),
         adapter: agentAdapterSchema,
         persona: z.string().min(1),
+        provider: z.string().min(1).optional(),
+        model: z.string().min(1).optional(),
+        thinking: piThinkingLevelSchema.optional(),
       }),
     )
     .min(1),
@@ -208,6 +236,7 @@ export const configSchema = z.object({
 export const localSessionSchema = z.object({
   sessionId: z.string().min(1),
   apiUrl: z.string().url(),
+  authToken: z.string().min(32),
 });
 
 export const gamePhaseSchema = z.enum(["agent_turn", "running", "waiting", "complete", "failed"]);
@@ -286,10 +315,12 @@ export const screenEvidenceSchema = z.object({
 export const runnerJobSchema = z.object({
   runId: z.string().min(1),
   sessionId: z.string().min(1),
+  authToken: z.string().min(32),
   targetUrl: z.string().url(),
   bridgeUrl: z.string().url(),
   maxTurns: z.number().int().min(1).max(100),
   timeoutSeconds: z.number().int().min(10).max(7200),
+  settleMs: z.number().int().min(0).max(10000).default(250),
   workDir: z.string().min(1).default("/gameqa-run"),
 });
 
@@ -329,6 +360,7 @@ export const runnerCompleteSchema = z.object({
   runId: z.string().min(1),
   sessionId: z.string().min(1),
   status: z.enum(["completed", "failed"]),
+  stopReason: z.enum(["agent_finish", "max_turns", "timeout", "failed"]),
   error: z.string().optional(),
   metrics: z.object({
     durationSeconds: z.number(),

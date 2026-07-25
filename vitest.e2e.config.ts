@@ -12,6 +12,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    exclude: ["e2e/**", "**/dist/**", "**/node_modules/**"],
+    include: ["e2e/**/*.test.ts"],
+    testTimeout: 180_000,
+    hookTimeout: 30_000,
   },
 });

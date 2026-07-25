@@ -12,8 +12,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "paths": {
-      "gameqa/shared": ["./packages/shared/src/index.ts"],
-      "gameqa/sdk": ["./packages/sdk/src/index.ts"]
+      "@gameqa/shared": ["./packages/shared/src/index.ts"],
+      "@gameqa/sdk": ["./packages/sdk/src/index.ts"]
     }
   }
 }

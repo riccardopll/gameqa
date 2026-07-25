@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildRunnerImageArgs,
-  buildCodexArgs,
+  createBridgeServer,
   dockerReachableUrl,
   ensureRunnerImage,
   initConfig,
@@ -29,10 +29,10 @@ describe("gameqa cli", () => {
   });
 
   it("parses commands and flags", () => {
-    const parsed = parseArgs(["run", "--agent", "codex-qa", "--url", "http://localhost:5173"]);
+    const parsed = parseArgs(["run", "--agent", "pi-qa", "--url", "http://localhost:5173"]);
 
     expect(parsed.command).toBe("run");
-    expect(parsed.flags.get("agent")).toBe("codex-qa");
+    expect(parsed.flags.get("agent")).toBe("pi-qa");
     expect(parsed.flags.get("url")).toBe("http://localhost:5173");
   });
 
@@ -42,7 +42,7 @@ describe("gameqa cli", () => {
     const config = await loadConfig(cwd);
 
     expect(configPath.endsWith("gameqa.config.ts")).toBe(true);
-    expect(config.agents[0]?.id).toBe("codex-qa");
+    expect(config.agents[0]?.id).toBe("pi-qa");
   });
 
   it("loads config and selects one agent", async () => {
@@ -51,17 +51,71 @@ describe("gameqa cli", () => {
       path.join(cwd, "gameqa.config.ts"),
       `export default {
               agents: [
-                { id: "codex-qa", adapter: "codex", persona: "QA" }
+                { id: "pi-qa", adapter: "pi", persona: "QA" }
               ]
             }`,
       "utf8",
     );
 
     const config = await loadConfig(cwd);
-    const agent = selectAgent(config, "codex-qa");
+    const agent = selectAgent(config, "pi-qa");
 
     expect(agent.persona).toBe("QA");
     expect(() => selectAgent(config, "missing")).toThrow("Unknown GameQA agent");
+  });
+
+  it("authenticates bridge requests", async () => {
+    const cwd = await makeTempDir();
+    const state: Parameters<typeof createBridgeServer>[0] = {
+      cwd,
+      agent: { id: "pi-qa", adapter: "pi", persona: "QA" },
+      runDir: "/gameqa-run",
+      hostRunDir: cwd,
+      runId: "run_test",
+      sessionId: "session_test",
+      events: [],
+      decisions: [],
+      completed: null,
+      authToken: "a".repeat(64),
+      piCommand: "pi",
+      agentTimeoutMs: 1000,
+      env: process.env,
+    };
+    const bridge = await createBridgeServer(state);
+
+    try {
+      const unauthorized = await fetch(`${bridge.localOrigin}/sdk/events`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      expect(unauthorized.status).toBe(401);
+
+      const wrongSession = await fetch(`${bridge.localOrigin}/sdk/events`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${state.authToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId: "wrong",
+          events: [{ type: "log", name: "test", payload: {}, createdAt: new Date().toISOString() }],
+        }),
+      });
+      expect(wrongSession.status).toBe(400);
+
+      const oversized = await fetch(`${bridge.localOrigin}/sdk/events`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${state.authToken}`,
+          "content-type": "application/json",
+        },
+        body: "x".repeat(1_000_001),
+      });
+      expect(oversized.status).toBe(413);
+    } finally {
+      await bridge.close();
+    }
   });
 
   it("maps local URLs to Docker host URLs", () => {
@@ -69,25 +123,6 @@ describe("gameqa cli", () => {
       "http://host.docker.internal:5173/game",
     );
     expect(dockerReachableUrl("https://example.com/game")).toBe("https://example.com/game");
-  });
-
-  it("builds a read-only Codex exec command", () => {
-    const args = buildCodexArgs({
-      cwd: "/repo",
-      schemaPath: "/run/schema.json",
-      outputPath: "/run/out.json",
-      promptPath: "/run/prompt.md",
-      imagePath: "/run/screenshot.png",
-    });
-
-    expect(args).toContain("exec");
-    expect(args).toContain("--sandbox");
-    expect(args).toContain("read-only");
-    expect(args).toContain("--output-schema");
-    expect(args).toContain("/run/schema.json");
-    expect(args).toContain("--image");
-    expect(args).toContain("/run/screenshot.png");
-    expect(args.at(-1)).toBe("-");
   });
 
   it("builds runner image setup commands", () => {
@@ -115,10 +150,12 @@ describe("gameqa cli", () => {
       job: {
         runId: "run_test",
         sessionId: "session_test",
+        authToken: "a".repeat(32),
         targetUrl: "http://host.docker.internal:5173",
         bridgeUrl: "http://host.docker.internal:3900",
         maxTurns: 5,
         timeoutSeconds: 60,
+        settleMs: 0,
         workDir: "/gameqa-run",
       },
     });

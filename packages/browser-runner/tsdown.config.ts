@@ -6,7 +6,7 @@ export default defineConfig({
   target: "node24",
   fixedExtension: false,
   deps: {
-    alwaysBundle: ["gameqa/shared", "zod"],
+    alwaysBundle: ["@gameqa/shared", "zod"],
     onlyBundle: ["zod"],
   },
 });

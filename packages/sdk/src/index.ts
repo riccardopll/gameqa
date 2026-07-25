@@ -8,12 +8,13 @@ import {
   type LocalSession,
   type SdkEvent,
   type SdkInspection,
-} from "gameqa/shared";
+} from "@gameqa/shared";
 
 export type InitOptions = {
   environment?: string;
   sessionId?: string;
   apiUrl?: string;
+  authToken?: string;
   flushIntervalMs?: number;
   maxBatchSize?: number;
   metadata?: JsonRecord;
@@ -47,6 +48,7 @@ type RuntimeGlobal = typeof globalThis & {
   __GAMEQA_SESSION__?: {
     sessionId?: string;
     apiUrl?: string;
+    authToken?: string;
   };
   __GAMEQA_AGENT__?: {
     inspect: () => Promise<SdkInspection>;
@@ -124,6 +126,7 @@ export const createClient = () => {
       const response = await fetch(buildUrl(state.session.apiUrl, "/sdk/events"), {
         method: "POST",
         headers: {
+          authorization: `Bearer ${state.session.authToken}`,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -267,6 +270,7 @@ export const createClient = () => {
     const session = localSessionSchema.safeParse({
       sessionId: options.sessionId ?? injected?.sessionId,
       apiUrl: options.apiUrl ?? injected?.apiUrl,
+      authToken: options.authToken ?? injected?.authToken,
     });
 
     state = {

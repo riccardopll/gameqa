@@ -26,6 +26,9 @@ importers:
 
   packages/browser-runner:
     dependencies:
+      '@gameqa/shared':
+        specifier: workspace:*
+        version: link:../shared
       playwright:
         specifier: ^1.61.0
         version: 1.61.0
@@ -55,7 +58,21 @@ importers:
         specifier: ^4.1.13
         version: 4.4.3
 
-  packages/sdk: {}
+  packages/demo-game:
+    dependencies:
+      '@gameqa/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
+
+  packages/sdk:
+    dependencies:
+      '@gameqa/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/shared:
     dependencies:

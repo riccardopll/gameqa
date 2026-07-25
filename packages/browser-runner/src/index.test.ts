@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { assertHttpTarget, chromiumLaunchOptions, injectedSession } from "./index";
-import type { RunnerJob } from "gameqa/shared";
+import type { RunnerJob } from "@gameqa/shared";
 
 const job: RunnerJob = {
   runId: "run_test",
   sessionId: "session_test",
+  authToken: "a".repeat(32),
   targetUrl: "http://host.docker.internal:5173/game",
   bridgeUrl: "http://host.docker.internal:3900",
   maxTurns: 5,
   timeoutSeconds: 60,
+  settleMs: 0,
   workDir: "/gameqa-run",
 };
 
@@ -17,6 +19,7 @@ describe("browser runner", () => {
     expect(injectedSession(job)).toEqual({
       sessionId: "session_test",
       apiUrl: "http://host.docker.internal:3900",
+      authToken: "a".repeat(32),
     });
   });
 

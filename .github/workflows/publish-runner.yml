@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: publish-runner-${{ github.ref }}
@@ -13,11 +14,12 @@ permissions:
   contents: read
   packages: write
 
-env:
-  IMAGE: ghcr.io/riccardopll/gameqa-browser-runner
-
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   publish:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -30,13 +32,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/riccardopll/gameqa-browser-runner
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: packages/browser-runner/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.IMAGE }}:latest
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=browser-runner-publish
+          cache-to: type=gha,mode=max,scope=browser-runner-publish

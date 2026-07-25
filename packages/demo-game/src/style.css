@@ -1,0 +1,102 @@
+:root {
+  color: #f7f1df;
+  background: #161324;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 20%, #382749, #161324 60%);
+}
+main {
+  width: min(760px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 56px 0;
+}
+header {
+  margin-bottom: 28px;
+}
+.eyebrow {
+  color: #ffbd59;
+  letter-spacing: 0.14em;
+  font-size: 0.75rem;
+}
+h1 {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: clamp(3rem, 10vw, 6rem);
+  color: #ff7759;
+}
+header > p:last-child {
+  color: #c7bdd4;
+  max-width: 620px;
+  line-height: 1.6;
+}
+.game {
+  border: 2px solid #ffbd59;
+  background: #211b31;
+  padding: 28px;
+  box-shadow: 10px 10px 0 #0b0911;
+}
+.stats {
+  display: flex;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #554968;
+}
+.stats strong {
+  color: #ffbd59;
+}
+.merchant {
+  display: grid;
+  place-items: center;
+  height: 180px;
+  font-size: 6rem;
+}
+.message {
+  min-height: 48px;
+  color: #ded6e7;
+  text-align: center;
+}
+.actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+button {
+  border: 1px solid #ffbd59;
+  background: #302640;
+  color: #fff6df;
+  padding: 14px;
+  cursor: pointer;
+  font: inherit;
+}
+button:hover,
+button:focus-visible {
+  background: #ffbd59;
+  color: #161324;
+}
+aside {
+  margin-top: 24px;
+  padding: 16px;
+  border-left: 4px solid #ff7759;
+  color: #b9aec6;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+aside strong {
+  color: #ff7759;
+}
+@media (max-width: 620px) {
+  .actions {
+    grid-template-columns: 1fr;
+  }
+  .stats {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

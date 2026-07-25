@@ -12,7 +12,7 @@ export default defineConfig({
   },
   fixedExtension: false,
   deps: {
-    alwaysBundle: ["gameqa/shared", "zod"],
+    alwaysBundle: ["@gameqa/shared", "zod"],
     onlyBundle: ["zod"],
     dts: {
       neverBundle: ["zod"],

@@ -11,9 +11,10 @@ import {
   type AgentDecision,
   type DecisionRequest,
   type JsonRecord,
+  type RunnerComplete,
   type RunnerJob,
   type SdkInspection,
-} from "gameqa/shared";
+} from "@gameqa/shared";
 
 type BridgePayload<T> = {
   ok?: boolean;
@@ -34,6 +35,7 @@ export const chromiumLaunchOptions = {
 export const injectedSession = (job: RunnerJob) => ({
   sessionId: job.sessionId,
   apiUrl: job.bridgeUrl,
+  authToken: job.authToken,
 });
 
 export const assertHttpTarget = (targetUrl: string) => {
@@ -59,6 +61,7 @@ const bridge = async <T>(job: RunnerJob, pathName: string, body: unknown) => {
   const response = await fetch(`${job.bridgeUrl}${pathName}`, {
     method: "POST",
     headers: {
+      authorization: `Bearer ${job.authToken}`,
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
@@ -243,6 +246,7 @@ export const runBrowserSession = async (job: RunnerJob) => {
   const videoDir = path.join(job.workDir, "videos");
   const tracePath = path.join(job.workDir, "trace.zip");
   const deadline = Date.now() + job.timeoutSeconds * 1000;
+  let stopReason: RunnerComplete["stopReason"] = "max_turns";
 
   try {
     await mkdir(videoDir, { recursive: true });
@@ -298,11 +302,19 @@ export const runBrowserSession = async (job: RunnerJob) => {
       stats.turns = turn;
 
       if (decision.type === "finish") {
+        stopReason = "agent_finish";
         break;
       }
 
       await applyDecision(page, decision);
+      if (job.settleMs > 0) {
+        await page.waitForTimeout(job.settleMs);
+      }
       await flushSdk(page).catch(() => undefined);
+    }
+
+    if (stopReason !== "agent_finish" && Date.now() >= deadline) {
+      stopReason = "timeout";
     }
 
     await flushSdk(page).catch(() => undefined);
@@ -316,11 +328,13 @@ export const runBrowserSession = async (job: RunnerJob) => {
     if (videoPath) {
       await copyFile(videoPath, path.join(job.workDir, "video.webm"));
     }
+    await rm(videoDir, { recursive: true, force: true });
 
     const complete = runnerCompleteSchema.parse({
       runId: job.runId,
       sessionId: job.sessionId,
       status: "completed",
+      stopReason,
       metrics: {
         durationSeconds: Math.round((Date.now() - stats.startedAt) / 1000),
         turns: stats.turns,
@@ -336,6 +350,7 @@ export const runBrowserSession = async (job: RunnerJob) => {
       runId: job.runId,
       sessionId: job.sessionId,
       status: "failed",
+      stopReason: "failed",
       error: error instanceof Error ? error.message : "Browser runner failed",
       metrics: {
         durationSeconds: Math.round((Date.now() - stats.startedAt) / 1000),

@@ -13,8 +13,8 @@ describe("shared contracts", () => {
     const config = configSchema.parse({
       agents: [
         {
-          id: "codex-qa",
-          adapter: "codex",
+          id: "pi-qa",
+          adapter: "pi",
           persona: "Find broken game state.",
         },
       ],
@@ -22,13 +22,16 @@ describe("shared contracts", () => {
 
     expect(config.run.outputDir).toBe(".gameqa/runs");
     expect(config.run.maxTurns).toBe(20);
-    expect(config.agents[0]?.adapter).toBe("codex");
+    expect(config.run.agentTimeoutSeconds).toBe(120);
+    expect(config.run.settleMs).toBe(250);
+    expect(config.agents[0]?.adapter).toBe("pi");
   });
 
   it("validates one local runner job", () => {
     const job = runnerJobSchema.parse({
       runId: "run_test",
       sessionId: "session_test",
+      authToken: "a".repeat(32),
       targetUrl: "http://host.docker.internal:5173",
       bridgeUrl: "http://host.docker.internal:3900",
       maxTurns: 5,
@@ -36,6 +39,7 @@ describe("shared contracts", () => {
     });
 
     expect(job.workDir).toBe("/gameqa-run");
+    expect(job.settleMs).toBe(250);
   });
 
   it("validates SDK event batches without hosted credentials", () => {

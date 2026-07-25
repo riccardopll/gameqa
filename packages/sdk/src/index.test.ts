@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SdkInspection } from "gameqa/shared";
+import type { SdkInspection } from "@gameqa/shared";
 import { createClient } from "./index";
 
 type Bridge = {
@@ -53,6 +53,7 @@ describe("GameQA SDK", () => {
     sdk.init({
       apiUrl: "http://localhost:3900",
       sessionId: "session_test",
+      authToken: "a".repeat(32),
     });
     sdk.event("card_seen", { card: "Strike" });
 
@@ -65,6 +66,7 @@ describe("GameQA SDK", () => {
     };
 
     expect(body.sessionId).toBe("session_test");
+    expect(new Headers(init?.headers).get("authorization")).toBe(`Bearer ${"a".repeat(32)}`);
     expect(body.events.map((event) => event.name)).toEqual(["sdk_initialized", "card_seen"]);
   });
 
@@ -73,6 +75,7 @@ describe("GameQA SDK", () => {
     sdk.init({
       apiUrl: "http://localhost:3900",
       sessionId: "session_test",
+      authToken: "a".repeat(32),
     });
     let applied = "";
     sdk.registerController({
@@ -98,6 +101,7 @@ describe("GameQA SDK", () => {
     sdk.init({
       apiUrl: "http://localhost:3900",
       sessionId: "session_test",
+      authToken: "a".repeat(32),
     });
     const calls: string[] = [];
     sdk.registerDriver({

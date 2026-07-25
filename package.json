@@ -4,8 +4,13 @@
   "scripts": {
     "build": "pnpm -r build",
     "check": "oxfmt . --check && oxlint . && pnpm typecheck && pnpm test && pnpm build",
+    "clean": "node scripts/clean.mjs",
+    "demo": "pnpm --filter @gameqa/demo-game dev",
     "fix": "oxfmt . --write && oxlint . --fix",
+    "package:smoke": "pnpm build && node scripts/package-smoke.mjs",
     "test": "vitest run",
+    "test:e2e": "pnpm build && docker build -f packages/browser-runner/Dockerfile -t gameqa-browser-runner:e2e . && GAMEQA_RUNNER_IMAGE=gameqa-browser-runner:e2e vitest run --config vitest.e2e.config.ts",
+    "test:e2e:run": "GAMEQA_RUNNER_IMAGE=gameqa-browser-runner:e2e vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck"
   },
   "devDependencies": {
@@ -14,6 +19,9 @@
     "oxlint": "^1.70.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "packageManager": "pnpm@11.7.0"
 }

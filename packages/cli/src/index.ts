@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { spawn } from "node:child_process";
 import { realpathSync } from "node:fs";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { toJSONSchema } from "zod";
 import {
   agentDecisionSchema,
   decisionRequestSchema,
@@ -21,7 +19,10 @@ import {
   type RunnerComplete,
   type RunnerJob,
   type SdkEvent,
-} from "gameqa/shared";
+} from "@gameqa/shared";
+import packageJson from "../package.json" with { type: "json" };
+import { runPiJson } from "./pi-adapter";
+import { runCommand } from "./process";
 
 type CliOptions = {
   cwd: string;
@@ -35,12 +36,6 @@ type RunOptions = {
   configPath?: string;
 };
 
-type CommandResult = {
-  code: number;
-  stdout: string;
-  stderr: string;
-};
-
 type BridgeState = {
   cwd: string;
   agent: Config["agents"][number];
@@ -51,22 +46,28 @@ type BridgeState = {
   events: SdkEvent[];
   decisions: AgentDecision[];
   completed: RunnerComplete | null;
-  codexCommand: string;
+  authToken: string;
+  piCommand: string;
+  agentTimeoutMs: number;
+  env: NodeJS.ProcessEnv;
 };
 
+const packageVersion = packageJson.version;
 const defaultConfigName = "gameqa.config.ts";
-const defaultRunnerImage = "ghcr.io/riccardopll/gameqa-browser-runner:latest";
+const defaultRunnerImage = `ghcr.io/riccardopll/gameqa-browser-runner:${packageVersion}`;
 
 const starterConfig = `export default {
   run: {
     outputDir: ".gameqa/runs",
     maxTurns: 20,
     timeoutSeconds: 300,
+    agentTimeoutSeconds: 120,
+    settleMs: 250,
   },
   agents: [
     {
-      id: "codex-qa",
-      adapter: "codex",
+      id: "pi-qa",
+      adapter: "pi",
       persona: "You are a rigorous game QA tester. Find broken state, unclear feedback, and edge-case failures.",
     },
   ],
@@ -80,10 +81,25 @@ const print = (message = "") => {
   process.stdout.write(`${message}\n`);
 };
 
-const readStdin = async (request: IncomingMessage) => {
+class BridgeRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+const readStdin = async (request: IncomingMessage, maxBytes = 1_000_000) => {
   const chunks: Buffer[] = [];
+  let bytes = 0;
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    bytes += buffer.length;
+    if (bytes > maxBytes) {
+      throw new BridgeRequestError(`Request body exceeds ${maxBytes} bytes`, 413);
+    }
+    chunks.push(buffer);
   }
   return Buffer.concat(chunks).toString("utf8");
 };
@@ -93,7 +109,7 @@ const sendJson = (response: ServerResponse, status: number, body: unknown) => {
     "content-type": "application/json",
     "access-control-allow-origin": "*",
     "access-control-allow-methods": "POST, OPTIONS",
-    "access-control-allow-headers": "content-type",
+    "access-control-allow-headers": "authorization, content-type",
   });
   response.end(JSON.stringify(body));
 };
@@ -102,7 +118,7 @@ const parseJson = (value: string) => {
   try {
     return JSON.parse(value) as unknown;
   } catch {
-    return null;
+    throw new BridgeRequestError("Request body must be valid JSON", 400);
   }
 };
 
@@ -174,30 +190,6 @@ export const selectAgent = (config: Config, agentId: string) => {
 
   return agent;
 };
-
-const runCommand = async (
-  command: string,
-  args: string[],
-  options: { cwd: string; env?: NodeJS.ProcessEnv },
-) =>
-  new Promise<CommandResult>((resolve) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env,
-      shell: false,
-    });
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
-    child.on("close", (code) => {
-      resolve({
-        code: code ?? 1,
-        stdout: Buffer.concat(stdout).toString("utf8"),
-        stderr: Buffer.concat(stderr).toString("utf8"),
-      });
-    });
-  });
 
 const dockerCommand = (env: NodeJS.ProcessEnv) => env.GAMEQA_DOCKER_COMMAND ?? "docker";
 
@@ -297,63 +289,6 @@ const makePrompt = (title: string, sections: Record<string, unknown>) =>
     ]),
   ].join("\n");
 
-export const buildCodexArgs = (input: {
-  cwd: string;
-  schemaPath: string;
-  outputPath: string;
-  promptPath: string;
-  imagePath?: string;
-}) => [
-  "exec",
-  "--cd",
-  input.cwd,
-  "--sandbox",
-  "read-only",
-  "--output-schema",
-  input.schemaPath,
-  "--output-last-message",
-  input.outputPath,
-  ...(input.imagePath ? ["--image", input.imagePath] : []),
-  "-",
-];
-
-const runCodexJson = async (input: {
-  cwd: string;
-  runDir: string;
-  kind: "decision" | "report";
-  prompt: string;
-  schema: unknown;
-  imagePath?: string;
-  command: string;
-}) => {
-  const dir = path.join(input.runDir, "codex", `${input.kind}s`);
-  await mkdir(dir, { recursive: true });
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const promptPath = path.join(dir, `${timestamp}.md`);
-  const outputPath = path.join(dir, `${timestamp}.json`);
-  const schemaPath = path.join(dir, `${timestamp}.schema.json`);
-  await writeFile(promptPath, input.prompt, "utf8");
-  await writeJson(schemaPath, input.schema);
-
-  const args = buildCodexArgs({
-    cwd: input.cwd,
-    schemaPath,
-    outputPath,
-    promptPath,
-    imagePath: input.imagePath,
-  });
-  const result = await runCommand(input.command, args, {
-    cwd: input.cwd,
-    env: process.env,
-  });
-
-  if (result.code !== 0) {
-    throw new Error(`Codex ${input.kind} failed: ${result.stderr || result.stdout}`);
-  }
-
-  return parseJson(await readFile(outputPath, "utf8"));
-};
-
 const decisionPrompt = (
   agent: Config["agents"][number],
   request: DecisionRequest,
@@ -370,37 +305,50 @@ const decisionPrompt = (
     "Previous Decisions": decisions,
   });
 
-const reportPrompt = (state: BridgeState) =>
+const reportPrompt = (
+  state: BridgeState,
+  evidence: { browserLog: string; screenshotText: Record<string, string> },
+) =>
   makePrompt("Write the final GameQA report.", {
     Persona: state.agent.persona,
     Rules:
-      "Return schema-valid JSON. Focus on game behavior, SDK state, visible evidence, video/screenshots, console/runtime failures, and concrete recommendations.",
+      "Return schema-valid JSON. Every finding must cite a real artifact path. Distinguish observed behavior from inference and give concrete recommendations.",
     Events: state.events,
     Decisions: state.decisions,
     Completion: state.completed,
+    "Browser Log": evidence.browserLog,
+    "Screenshot Text": evidence.screenshotText,
     Artifacts: {
       video: "video.webm",
       trace: "trace.zip",
       screenshots: "screenshots/",
+      events: "events.json",
+      actions: "actions.json",
     },
   });
 
 const handleDecision = async (state: BridgeState, body: unknown) => {
   const request = decisionRequestSchema.parse(body);
-  const hostScreenshotPath = path.join(
-    state.hostRunDir,
-    path.relative(state.runDir, request.evidence.screenshotPath),
-  );
-  const payload = await runCodexJson({
+  if (request.runId !== state.runId || request.sessionId !== state.sessionId) {
+    throw new BridgeRequestError("Invalid run or session", 400);
+  }
+  const relativeScreenshotPath = path.relative(state.runDir, request.evidence.screenshotPath);
+  if (relativeScreenshotPath.startsWith("..") || path.isAbsolute(relativeScreenshotPath)) {
+    throw new BridgeRequestError("Screenshot path is outside the run directory", 400);
+  }
+  const hostScreenshotPath = path.join(state.hostRunDir, relativeScreenshotPath);
+  const decision = await runPiJson({
     cwd: state.cwd,
+    env: state.env,
     runDir: state.hostRunDir,
     kind: "decision",
     prompt: decisionPrompt(state.agent, request, state.events, state.decisions),
-    schema: toJSONSchema(agentDecisionSchema),
-    imagePath: hostScreenshotPath,
-    command: state.codexCommand,
+    schema: agentDecisionSchema,
+    imagePaths: [hostScreenshotPath],
+    command: state.piCommand,
+    agent: state.agent,
+    timeoutMs: state.agentTimeoutMs,
   });
-  const decision = agentDecisionSchema.parse(payload);
   state.decisions.push(decision);
   await writeJson(path.join(state.hostRunDir, "actions.json"), state.decisions);
 
@@ -409,6 +357,9 @@ const handleDecision = async (state: BridgeState, body: unknown) => {
 
 const handleComplete = async (state: BridgeState, body: unknown) => {
   const complete = runnerCompleteSchema.parse(body);
+  if (complete.runId !== state.runId || complete.sessionId !== state.sessionId) {
+    throw new BridgeRequestError("Invalid run or session", 400);
+  }
   state.completed = complete;
   await writeJson(path.join(state.hostRunDir, "session.json"), complete);
 };
@@ -426,10 +377,15 @@ export const createBridgeServer = async (state: BridgeState) => {
         return;
       }
 
-      const url = new URL(request.url ?? "/", "http://gameqa.local");
-      const body = parseJson(await readStdin(request));
+      if (request.headers.authorization !== `Bearer ${state.authToken}`) {
+        sendJson(response, 401, { error: "Unauthorized" });
+        return;
+      }
 
       try {
+        const url = new URL(request.url ?? "/", "http://gameqa.local");
+        const body = parseJson(await readStdin(request));
+
         if (url.pathname === "/sdk/events") {
           const batch = sdkEventBatchSchema.parse(body);
           if (batch.sessionId !== state.sessionId) {
@@ -457,7 +413,7 @@ export const createBridgeServer = async (state: BridgeState) => {
 
         sendJson(response, 404, { error: "Bridge route not found" });
       } catch (error) {
-        sendJson(response, 500, {
+        sendJson(response, error instanceof BridgeRequestError ? error.status : 500, {
           error: error instanceof Error ? error.message : "Bridge request failed",
         });
       }
@@ -493,6 +449,7 @@ const runDockerRunner = async (
   const result = await runCommand(dockerCommand(env), runRunnerImageArgs({ image, runDir, job }), {
     cwd,
     env,
+    timeoutMs: (job.timeoutSeconds + 60) * 1000,
   });
 
   if (result.code !== 0) {
@@ -510,16 +467,53 @@ const writeRunSummary = async (state: BridgeState, options: RunOptions) => {
   });
 };
 
+const readOptionalFile = async (filePath: string) =>
+  readFile(filePath, "utf8").catch(() => "(artifact not produced)");
+
+const collectReportEvidence = async (runDir: string) => {
+  const screenshotsDir = path.join(runDir, "screenshots");
+  const names = await readdir(screenshotsDir).catch(() => []);
+  const textNames = names
+    .filter((name) => name.endsWith(".txt"))
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }))
+    .slice(-20);
+  const screenshotText = Object.fromEntries(
+    await Promise.all(
+      textNames.map(async (name) => [
+        `screenshots/${name}`,
+        await readOptionalFile(path.join(screenshotsDir, name)),
+      ]),
+    ),
+  );
+  const imageNames = names
+    .filter((name) => name.endsWith(".png"))
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+  const selectedImages = [...new Set([imageNames[0], imageNames.at(-1)])]
+    .filter((name): name is string => Boolean(name))
+    .map((name) => path.join(screenshotsDir, name));
+
+  const browserLog = await readOptionalFile(path.join(runDir, "browser.log"));
+  return {
+    browserLog: browserLog.slice(-50_000),
+    screenshotText,
+    selectedImages,
+  };
+};
+
 const writeFinalReport = async (state: BridgeState) => {
-  const payload = await runCodexJson({
+  const evidence = await collectReportEvidence(state.hostRunDir);
+  const report = await runPiJson({
     cwd: state.cwd,
+    env: state.env,
     runDir: state.hostRunDir,
     kind: "report",
-    prompt: reportPrompt(state),
-    schema: toJSONSchema(reportSchema),
-    command: state.codexCommand,
+    prompt: reportPrompt(state, evidence),
+    schema: reportSchema,
+    imagePaths: evidence.selectedImages,
+    command: state.piCommand,
+    agent: state.agent,
+    timeoutMs: state.agentTimeoutMs,
   });
-  const report = reportSchema.parse(payload);
   await writeJson(path.join(state.hostRunDir, "report.json"), report);
   await writeFile(path.join(state.hostRunDir, "report.md"), reportMarkdown(report), "utf8");
 };
@@ -544,8 +538,11 @@ export const runSession = async (options: RunOptions, cli: CliOptions) => {
   const agent = selectAgent(config, options.agentId);
   const runId = createId("run");
   const sessionId = createId("session");
+  const authToken = `${crypto.randomUUID()}${crypto.randomUUID()}`;
   const hostRunDir = path.resolve(cli.cwd, config.run.outputDir, runId);
   await mkdir(hostRunDir, { recursive: true });
+  // The runner uses the non-root Playwright image user, whose UID can differ from the host user.
+  await chmod(hostRunDir, 0o777);
 
   const state: BridgeState = {
     cwd: cli.cwd,
@@ -557,7 +554,10 @@ export const runSession = async (options: RunOptions, cli: CliOptions) => {
     events: [],
     decisions: [],
     completed: null,
-    codexCommand: cli.env.GAMEQA_CODEX_COMMAND ?? "codex",
+    authToken,
+    piCommand: cli.env.GAMEQA_PI_COMMAND ?? "pi",
+    agentTimeoutMs: config.run.agentTimeoutSeconds * 1000,
+    env: cli.env,
   };
   await writeRunSummary(state, options);
   const bridge = await createBridgeServer(state);
@@ -566,10 +566,12 @@ export const runSession = async (options: RunOptions, cli: CliOptions) => {
     const job = runnerJobSchema.parse({
       runId,
       sessionId,
+      authToken,
       targetUrl: dockerReachableUrl(options.url),
       bridgeUrl: bridge.origin,
       maxTurns: config.run.maxTurns,
       timeoutSeconds: config.run.timeoutSeconds,
+      settleMs: config.run.settleMs,
       workDir: "/gameqa-run",
     });
     await runDockerRunner(job, hostRunDir, cli.cwd, cli.env);
@@ -587,8 +589,28 @@ export const runSession = async (options: RunOptions, cli: CliOptions) => {
   }
 };
 
-const runCli = async (cli: CliOptions) => {
+const printUsage = () => {
+  print("GameQA - local agent-driven playtesting for instrumented web games");
+  print();
+  print("Usage:");
+  print("  gameqa init");
+  print("  gameqa run --agent <id> --url <url> [--config <path>]");
+  print();
+  print("Requires Docker and an authenticated Pi installation.");
+};
+
+export const runCli = async (cli: CliOptions) => {
   const { command, flags } = parseArgs(cli.argv);
+
+  if (!command || command === "help" || command === "--help" || command === "-h") {
+    printUsage();
+    return;
+  }
+
+  if (command === "version" || command === "--version" || command === "-v") {
+    print(packageVersion);
+    return;
+  }
 
   if (command === "init") {
     const configPath = await initConfig(cli.cwd);
@@ -610,9 +632,7 @@ const runCli = async (cli: CliOptions) => {
     return;
   }
 
-  print("Usage:");
-  print("  gameqa init");
-  print("  gameqa run --agent <id> --url <url>");
+  throw new Error(`Unknown command: ${command}. Run gameqa --help for usage.`);
 };
 
 const isCliEntrypoint = () => {
