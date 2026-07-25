@@ -60,9 +60,9 @@ This file tracks the local-first product work. Checked items are implemented and
 These require repository-owner credentials and cannot be completed from the current unauthenticated machine:
 
 - [x] Re-authenticate the GitHub CLI or push through an authenticated Git remote.
-- [x] Configure npm trusted publishing for `gameqa` (or add `NPM_TOKEN`).
+- [ ] Configure the npm trusted publisher for `riccardopll/gameqa` and `release.yml`.
 - [x] Push the changes and let the main-branch CI/publish workflow pass.
-- [ ] Push tag `v0.1.0`; verify npm, GHCR version tag, and GitHub release publication.
+- [x] Push tag `v0.1.0`; verify npm, GHCR version tag, and GitHub release publication.
 
 ## Later
 

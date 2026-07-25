@@ -50,8 +50,6 @@ jobs:
           else
             npm publish ./packages/cli --access public --provenance
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Create GitHub release
         run: gh release create "$GITHUB_REF_NAME" artifacts/*.tgz --generate-notes
         env:

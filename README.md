@@ -2,7 +2,7 @@
 
 GameQA is a local CLI for agent-driven playtesting of SDK-instrumented web games. It gives [Pi](https://pi.dev) a Chromium session, structured game state, screenshots, visible text, and runtime evidence, then writes a replayable local report.
 
-> Status: release candidate. Unit tests and a full Docker E2E fixture are included. The npm package is published by the tag release workflow after npm trusted publishing is configured.
+> Status: v0.1.0 is available on npm and GHCR. Unit tests and a full Docker E2E fixture are included.
 
 ## How it works
 
@@ -26,8 +26,6 @@ The game remains in control: it exposes legal controller actions and/or higher-l
 - [Pi](https://pi.dev) installed and authenticated (`pi /login`)
 
 ## Install
-
-After the first npm release:
 
 ```bash
 pnpm add -D gameqa
@@ -185,7 +183,7 @@ See [`TODO.md`](TODO.md) for current progress.
 3. Push a matching tag, for example `v0.1.0`.
 4. `.github/workflows/release.yml` verifies the repository, publishes the versioned runner image and npm package with provenance, and creates a GitHub release.
 
-Configure npm trusted publishing for this GitHub repository before the first tag. An `NPM_TOKEN` can be supplied as a fallback. Main-branch runner builds publish `latest` and `sha-<commit>` only after the full CI workflow succeeds.
+Configure npm trusted publishing for this GitHub repository and `release.yml`. Releases use short-lived GitHub OIDC credentials, so no npm token or repeated interactive login is needed. Main-branch runner builds publish `latest` and `sha-<commit>` only after the full CI workflow succeeds.
 
 ## Security model
 
