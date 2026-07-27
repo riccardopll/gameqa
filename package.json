@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:e2e": "pnpm build && docker build -f packages/browser-runner/Dockerfile -t gameqa-browser-runner:e2e . && GAMEQA_RUNNER_IMAGE=gameqa-browser-runner:e2e vitest run --config vitest.e2e.config.ts",
     "test:e2e:run": "GAMEQA_RUNNER_IMAGE=gameqa-browser-runner:e2e vitest run --config vitest.e2e.config.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck"
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
+    "version:minor": "pnpm --filter gameqa version minor"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
