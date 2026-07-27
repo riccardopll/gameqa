@@ -1,6 +1,6 @@
 {
   "name": "gameqa",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local Pi-powered playtesting for SDK-instrumented web games.",
   "keywords": [
     "game-testing",
