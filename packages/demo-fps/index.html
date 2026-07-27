@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <meta
+      name="description"
+      content="Neon Range, a real-time Three.js FPS instrumented with GameQA."
+    />
+    <title>Neon Range — GameQA FPS demo</title>
+  </head>
+  <body>
+    <main id="game-shell">
+      <canvas id="viewport" aria-label="First-person view of the Neon Range arena"></canvas>
+
+      <header class="brand">
+        <p>GAMEQA · REAL-TIME DEMO</p>
+        <h1>NEON RANGE</h1>
+      </header>
+
+      <section class="scoreboard" aria-label="Match statistics">
+        <span>Score <strong id="score">0</strong></span>
+        <span>Targets <strong id="targets">3</strong></span>
+        <span>Accuracy <strong id="accuracy">—</strong></span>
+      </section>
+
+      <div class="crosshair" aria-hidden="true"><i></i><b></b></div>
+      <div id="hitmarker" class="hitmarker" aria-hidden="true">×</div>
+
+      <section class="weapon-hud" aria-label="Current weapon and ammunition" aria-live="polite">
+        <p id="weapon-slot">01 / SIDEARM</p>
+        <div>
+          <strong id="ammo">12</strong><span>/ <span id="reserve">48</span></span>
+        </div>
+        <p id="weapon-stats">SEMI · 34 DMG · HIGH PRECISION</p>
+      </section>
+
+      <p id="status" class="status" aria-live="polite">Click Deploy to enter the range.</p>
+      <p id="asset-status" class="asset-status">Props: procedural fallback</p>
+
+      <section id="launch-panel" class="launch-panel">
+        <p class="kicker">LIVE FIRE SIMULATION</p>
+        <h2>Three targets.<br />Two weapons.</h2>
+        <p>Clear the range, test both loadouts, and stay inside the arena.</p>
+        <button id="deploy" type="button">Deploy to range</button>
+        <div class="controls">
+          <span><kbd>WASD</kbd> Move</span><span><kbd>MOUSE</kbd> Aim / fire</span>
+          <span><kbd>1 / 2</kbd> Switch</span><span><kbd>R</kbd> Reload</span>
+        </div>
+      </section>
+
+      <button id="reset" class="reset" type="button">Reset range</button>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

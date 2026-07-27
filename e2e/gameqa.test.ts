@@ -1,5 +1,5 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -9,9 +9,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const execute = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const fakePi = path.join(repoRoot, "e2e/fixtures/fake-pi.mjs");
-let preview: ChildProcess | undefined;
-let port = 0;
+const fakePi = path.join(repoRoot, "e2e/fixtures/fake-pi.ts");
+const demoServers: ChildProcess[] = [];
+const ports: Record<"cc" | "fps", number> = { cc: 0, fps: 0 };
 let fixtureDir = "";
 
 const freePort = async () =>
@@ -42,89 +42,129 @@ const waitForUrl = async (url: string) => {
   throw new Error(`Timed out waiting for ${url}`);
 };
 
+const startDemoServer = async (packageName: string, port: number) => {
+  const server = spawn(
+    "pnpm",
+    ["--filter", packageName, "dev", "--port", String(port), "--strictPort"],
+    { cwd: repoRoot, env: process.env, stdio: "pipe" },
+  );
+  demoServers.push(server);
+  await waitForUrl(`http://127.0.0.1:${port}`);
+};
+
 beforeAll(async () => {
-  port = await freePort();
+  [ports.cc, ports.fps] = await Promise.all([freePort(), freePort()]);
   fixtureDir = await mkdtemp(path.join(tmpdir(), "gameqa-e2e-"));
   await writeFile(
     path.join(fixtureDir, "gameqa.config.ts"),
     `export default {
-      run: { outputDir: ".gameqa/runs", maxTurns: 4, timeoutSeconds: 120, agentTimeoutSeconds: 10, settleMs: 50 },
-      agents: [{ id: "pi-qa", adapter: "pi", persona: "Reproduce economy invariants." }],
+      run: { outputDir: ".gameqa/runs", maxTurns: 5, timeoutSeconds: 120, agentTimeoutSeconds: 10, settleMs: 80 },
+      agents: [{ id: "pi-qa", adapter: "pi", persona: "Verify each demo's core gameplay loop and report only observed defects." }],
     };\n`,
     "utf8",
   );
 
-  preview = spawn(
-    "pnpm",
-    ["--filter", "@gameqa/demo-game", "preview", "--port", String(port), "--strictPort"],
-    { cwd: repoRoot, env: process.env, stdio: "pipe" },
-  );
-  await waitForUrl(`http://127.0.0.1:${port}`);
+  await Promise.all([
+    startDemoServer("@gameqa/demo-cc", ports.cc),
+    startDemoServer("@gameqa/demo-fps", ports.fps),
+  ]);
 });
 
 afterAll(async () => {
-  preview?.kill("SIGTERM");
+  for (const server of demoServers) server.kill("SIGTERM");
   await rm(fixtureDir, { recursive: true, force: true });
 });
 
-describe("GameQA full run", () => {
-  it("finds the demo economy defect and writes complete evidence", async () => {
-    const invocation = await execute(
-      "node",
-      [
-        path.join(repoRoot, "packages/cli/dist/index.js"),
-        "run",
-        "--agent",
-        "pi-qa",
-        "--url",
-        `http://127.0.0.1:${port}`,
-      ],
-      {
-        cwd: fixtureDir,
-        env: {
-          ...process.env,
-          GAMEQA_PI_COMMAND: fakePi,
-          GAMEQA_RUNNER_IMAGE: process.env.GAMEQA_RUNNER_IMAGE ?? "gameqa-browser-runner:e2e",
-        },
-        timeout: 170_000,
+type RunArtifacts = {
+  runDir: string;
+  actions: Array<{ type: string; actionId?: string; scenario?: string }>;
+  events: Array<{ name: string; payload: Record<string, unknown> }>;
+  report: { summary: string; findings: Array<{ id: string }> };
+  session: { status: string; stopReason: string };
+  lastEvidence: string;
+};
+
+const runGame = async (port: number): Promise<RunArtifacts> => {
+  const invocation = await execute(
+    "node",
+    [
+      path.join(repoRoot, "packages/cli/dist/index.js"),
+      "run",
+      "--agent",
+      "pi-qa",
+      "--url",
+      `http://127.0.0.1:${port}`,
+    ],
+    {
+      cwd: fixtureDir,
+      env: {
+        ...process.env,
+        GAMEQA_PI_COMMAND: fakePi,
+        GAMEQA_RUNNER_IMAGE: process.env.GAMEQA_RUNNER_IMAGE ?? "gameqa-browser-runner:e2e",
       },
-    );
-    const relativeRunDir = invocation.stdout.match(/GameQA run complete: (.+)/)?.[1]?.trim();
-    expect(relativeRunDir).toBeTruthy();
-    const runDir = path.resolve(fixtureDir, relativeRunDir ?? "missing");
+      timeout: 170_000,
+    },
+  );
+  const relativeRunDir = invocation.stdout.match(/GameQA run complete: (.+)/)?.[1]?.trim();
+  expect(relativeRunDir).toBeTruthy();
+  const runDir = path.resolve(fixtureDir, relativeRunDir ?? "missing");
 
-    const actions = JSON.parse(await readFile(path.join(runDir, "actions.json"), "utf8")) as Array<{
-      type: string;
-      actionId?: string;
-    }>;
-    const events = JSON.parse(await readFile(path.join(runDir, "events.json"), "utf8")) as Array<{
-      name: string;
-    }>;
-    const report = JSON.parse(await readFile(path.join(runDir, "report.json"), "utf8")) as {
-      findings: Array<{ id: string }>;
-    };
-    const session = JSON.parse(await readFile(path.join(runDir, "session.json"), "utf8")) as {
-      stopReason: string;
-    };
+  const [actions, events, report, session] = await Promise.all([
+    readFile(path.join(runDir, "actions.json"), "utf8").then(JSON.parse),
+    readFile(path.join(runDir, "events.json"), "utf8").then(JSON.parse),
+    readFile(path.join(runDir, "report.json"), "utf8").then(JSON.parse),
+    readFile(path.join(runDir, "session.json"), "utf8").then(JSON.parse),
+  ]);
 
-    expect(actions).toMatchObject([
-      { type: "controller_action", actionId: "buy_flask" },
+  const evidenceNames = await readdir(path.join(runDir, "screenshots"));
+  const textNames = evidenceNames
+    .filter((name) => name.endsWith(".txt"))
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+  expect(evidenceNames.filter((name) => name.endsWith(".png")).length).toBeGreaterThanOrEqual(2);
+  expect(textNames.length).toBeGreaterThanOrEqual(2);
+  const lastEvidence = await readFile(path.join(runDir, "screenshots", textNames.at(-1)!), "utf8");
+  await Promise.all([
+    expect(stat(path.join(runDir, "video.webm"))).resolves.toBeDefined(),
+    expect(stat(path.join(runDir, "trace.zip"))).resolves.toBeDefined(),
+    expect(stat(path.join(runDir, "videos"))).rejects.toThrow(),
+  ]);
+  expect(session).toMatchObject({ status: "completed", stopReason: "agent_finish" });
+  expect(report.findings).toEqual([]);
+
+  return { runDir, actions, events, report, session, lastEvidence };
+};
+
+describe("GameQA demo games", () => {
+  it("runs the clicker economy through an automatic-production purchase", async () => {
+    const result = await runGame(ports.cc);
+
+    expect(result.actions).toMatchObject([
+      { type: "scenario", scenario: "seedBakery" },
+      { type: "controller_action", actionId: "buy_oven" },
       { type: "finish" },
     ]);
-    expect(events.map((event) => event.name)).toContain("purchase_completed");
-    expect(events.map((event) => event.name)).toContain("Economy invariant violated");
-    expect(report.findings[0]?.id).toBe("negative-gold-purchase");
-    expect(session.stopReason).toBe("agent_finish");
-    await expect(stat(path.join(runDir, "screenshots/turn-1.png"))).resolves.toBeDefined();
-    await expect(stat(path.join(runDir, "screenshots/turn-2.txt"))).resolves.toBeDefined();
-    await expect(stat(path.join(runDir, "video.webm"))).resolves.toBeDefined();
-    await expect(stat(path.join(runDir, "trace.zip"))).resolves.toBeDefined();
-    await expect(stat(path.join(runDir, "videos"))).rejects.toThrow();
-    expect(await readFile(path.join(runDir, "browser.log"), "utf8")).toContain(
-      "Economy invariant violated",
-    );
-    expect(await readFile(path.join(runDir, "report.md"), "utf8")).toContain(
-      "Unaffordable flask purchase",
-    );
+    expect(result.events.map((event) => event.name)).toContain("bakery_seeded");
+    expect(result.events.map((event) => event.name)).toContain("upgrade_purchased");
+    const purchase = result.events.find((event) => event.name === "upgrade_purchased");
+    expect(purchase?.payload).toMatchObject({ upgradeId: "oven", cost: 100, balance: 150 });
+    expect(result.report.summary).toContain("valid economy");
+    expect(result.lastEvidence).toContain("Crumb Foundry");
+  });
+
+  it("runs the real-time FPS through weapon switching and firing", async () => {
+    const result = await runGame(ports.fps);
+
+    expect(result.actions).toMatchObject([
+      { type: "controller_action", actionId: "switch_rifle" },
+      { type: "controller_action", actionId: "fire_weapon" },
+      { type: "finish" },
+    ]);
+    expect(result.events.map((event) => event.name)).toContain("weapon_switched");
+    expect(result.events.map((event) => event.name)).toContain("weapon_fired");
+    const fired = result.events.find((event) => event.name === "weapon_fired");
+    expect(fired?.payload).toMatchObject({ weapon: "rifle", ammo: 29, shotsFired: 1 });
+    expect(result.report.summary).toContain("real-time arena");
+    expect(result.lastEvidence).toContain("NEON RANGE");
+    expect(result.lastEvidence).toContain("PULSE RIFLE");
   });
 });

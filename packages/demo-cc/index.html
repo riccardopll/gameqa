@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <meta
+      name="description"
+      content="Crumb Foundry, a compact incremental game instrumented with GameQA."
+    />
+    <title>Crumb Foundry — GameQA clicker demo</title>
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">GAMEQA · INCREMENTAL DEMO</p>
+          <h1>Crumb Foundry</h1>
+        </div>
+        <button id="reset" class="text-button" type="button">Reset progress</button>
+      </header>
+
+      <section class="game" aria-label="Crumb Foundry clicker game">
+        <div class="bakery-panel">
+          <p class="label">Freshly baked</p>
+          <p class="counter"><strong id="cookies">0</strong> cookies</p>
+          <p class="rate">
+            <span id="cps">0</span> per second · <span id="click-power">1</span> per click
+          </p>
+
+          <button id="cookie" class="cookie" type="button" aria-label="Bake a cookie">
+            <span aria-hidden="true" class="cookie-face">●</span>
+            <span>Bake</span>
+          </button>
+
+          <p id="message" class="message" aria-live="polite">Tap the cookie to start the ovens.</p>
+          <dl class="lifetime">
+            <div>
+              <dt>Lifetime baked</dt>
+              <dd id="lifetime">0</dd>
+            </div>
+            <div>
+              <dt>Upgrades owned</dt>
+              <dd id="owned">0</dd>
+            </div>
+          </dl>
+        </div>
+
+        <section class="shop" aria-labelledby="shop-title">
+          <div class="shop-heading">
+            <div>
+              <p class="label">Production line</p>
+              <h2 id="shop-title">Upgrades</h2>
+            </div>
+            <span id="economy-status" class="status">Economy stable</span>
+          </div>
+          <div id="upgrades" class="upgrade-list"></div>
+        </section>
+      </section>
+
+      <footer>
+        A compact clicker with persistent progress, compounding prices, and real-time production.
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

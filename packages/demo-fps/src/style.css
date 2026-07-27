@@ -1,0 +1,307 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;900&family=DM+Mono:wght@400;500&display=swap");
+
+:root {
+  color: #eafff7;
+  background: #050807;
+  font-family: "DM Mono", monospace;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#game-shell {
+  width: 100%;
+  height: 100%;
+}
+body {
+  margin: 0;
+  overflow: hidden;
+}
+button {
+  font: inherit;
+}
+#game-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: #07100d;
+}
+#viewport {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+#game-shell::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 5%) 0 1px, transparent 1px 4px),
+    radial-gradient(circle, transparent 55%, rgb(0 0 0 / 55%));
+  content: "";
+}
+.brand,
+.scoreboard,
+.weapon-hud,
+.status,
+.asset-status,
+.reset {
+  position: absolute;
+  z-index: 3;
+}
+.brand {
+  top: 25px;
+  left: 30px;
+  border-left: 3px solid #69ffb7;
+  padding-left: 13px;
+}
+.brand p,
+.kicker {
+  margin: 0;
+  color: #69ffb7;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+}
+.brand h1 {
+  margin: 2px 0 0;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 2rem;
+  font-style: italic;
+  line-height: 0.9;
+  letter-spacing: 0.03em;
+}
+.scoreboard {
+  top: 25px;
+  right: 30px;
+  display: flex;
+  gap: 8px;
+}
+.scoreboard > span {
+  min-width: 88px;
+  border-top: 1px solid rgb(105 255 183 / 45%);
+  padding: 8px 10px;
+  color: #8ea99d;
+  background: rgb(2 9 6 / 67%);
+  font-size: 0.57rem;
+  text-transform: uppercase;
+}
+.scoreboard strong {
+  display: block;
+  margin-top: 3px;
+  color: #fff;
+  font-size: 1rem;
+}
+.crosshair {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.crosshair::before,
+.crosshair::after,
+.crosshair i::before,
+.crosshair i::after {
+  position: absolute;
+  background: #dffff0;
+  box-shadow: 0 0 5px #69ffb7;
+  content: "";
+}
+.crosshair::before {
+  top: 0;
+  left: 13px;
+  width: 2px;
+  height: 8px;
+}
+.crosshair::after {
+  bottom: 0;
+  left: 13px;
+  width: 2px;
+  height: 8px;
+}
+.crosshair i::before {
+  top: 13px;
+  left: 0;
+  width: 8px;
+  height: 2px;
+}
+.crosshair i::after {
+  top: 13px;
+  right: 0;
+  width: 8px;
+  height: 2px;
+}
+.crosshair b {
+  position: absolute;
+  top: 13px;
+  left: 13px;
+  width: 2px;
+  height: 2px;
+  background: #ff674d;
+}
+.hitmarker {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  left: 50%;
+  color: white;
+  font-size: 2.5rem;
+  opacity: 0;
+  transform: translate(-50%, -55%);
+  transition: opacity 80ms;
+}
+.hitmarker.visible {
+  opacity: 1;
+}
+.weapon-hud {
+  right: 30px;
+  bottom: 28px;
+  min-width: 260px;
+  border-right: 4px solid #69ffb7;
+  padding: 5px 16px 5px 0;
+  text-align: right;
+  text-shadow: 0 2px 5px #000;
+}
+.weapon-hud p {
+  margin: 0;
+  color: #96c5ad;
+  font-size: 0.59rem;
+  letter-spacing: 0.11em;
+}
+.weapon-hud > div {
+  display: flex;
+  justify-content: end;
+  align-items: end;
+  gap: 10px;
+  height: 58px;
+  font-family: "Barlow Condensed", sans-serif;
+}
+.weapon-hud strong {
+  color: white;
+  font-size: 4.8rem;
+  line-height: 0.8;
+}
+.weapon-hud div span {
+  color: #b5c9bf;
+  font-size: 1rem;
+}
+.status {
+  bottom: 30px;
+  left: 30px;
+  max-width: 440px;
+  margin: 0;
+  color: #d1e7dc;
+  font-size: 0.68rem;
+  text-shadow: 0 2px 4px #000;
+}
+.asset-status {
+  bottom: 52px;
+  left: 30px;
+  margin: 0;
+  color: #6f9883;
+  font-size: 0.52rem;
+  text-transform: uppercase;
+}
+.reset {
+  top: 95px;
+  left: 30px;
+  border: 1px solid rgb(105 255 183 / 35%);
+  padding: 7px 10px;
+  color: #92b8a5;
+  background: rgb(2 9 6 / 67%);
+  cursor: pointer;
+  font-size: 0.58rem;
+  text-transform: uppercase;
+}
+.launch-panel {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  left: 50%;
+  width: min(520px, calc(100% - 38px));
+  border: 1px solid rgb(105 255 183 / 50%);
+  padding: 38px;
+  background: rgb(4 13 10 / 91%);
+  box-shadow: 0 25px 90px #000;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(12px);
+}
+.launch-panel.hidden {
+  display: none;
+}
+.launch-panel h2 {
+  margin: 10px 0 12px;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: clamp(2.8rem, 8vw, 5rem);
+  font-style: italic;
+  line-height: 0.86;
+  text-transform: uppercase;
+}
+.launch-panel > p:not(.kicker) {
+  max-width: 390px;
+  color: #98aa9f;
+  font-size: 0.75rem;
+  line-height: 1.65;
+}
+.launch-panel button {
+  width: 100%;
+  margin: 20px 0;
+  border: 0;
+  padding: 14px;
+  color: #06100c;
+  background: #69ffb7;
+  cursor: pointer;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+.launch-panel button:hover {
+  background: white;
+}
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  color: #82958b;
+  font-size: 0.58rem;
+}
+kbd {
+  display: inline-block;
+  min-width: 46px;
+  margin-right: 6px;
+  border: 1px solid #496357;
+  border-radius: 2px;
+  padding: 3px;
+  color: #d9ede3;
+  text-align: center;
+}
+@media (max-width: 650px) {
+  .scoreboard {
+    top: 95px;
+    left: 30px;
+    right: auto;
+  }
+  .scoreboard > span {
+    min-width: 75px;
+  }
+  .weapon-hud {
+    right: 18px;
+    bottom: 20px;
+  }
+  .status,
+  .asset-status {
+    left: 18px;
+    max-width: 45%;
+  }
+  .launch-panel {
+    padding: 26px;
+  }
+}

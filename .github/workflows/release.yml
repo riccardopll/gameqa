@@ -41,7 +41,7 @@ jobs:
         run: |
           VERSION=$(node -p "require('./packages/cli/package.json').version")
           test "${GITHUB_REF_NAME}" = "v${VERSION}"
-      - run: node scripts/package-smoke.mjs
+      - run: bash scripts/package-smoke.sh
       - name: Publish npm package
         run: |
           VERSION=$(node -p "require('./packages/cli/package.json').version")

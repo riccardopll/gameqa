@@ -1,0 +1,18 @@
+{
+  "name": "@gameqa/demo-cc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --host 0.0.0.0",
+    "preview": "vite preview --host 0.0.0.0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gameqa/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.0.16"
+  }
+}
