@@ -64,6 +64,9 @@ importers:
         specifier: workspace:*
         version: link:../sdk
     devDependencies:
+      gameqa:
+        specifier: workspace:*
+        version: link:../cli
       vite:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
@@ -80,6 +83,9 @@ importers:
       '@types/three':
         specifier: ^0.179.0
         version: 0.179.0
+      gameqa:
+        specifier: workspace:*
+        version: link:../cli
       vite:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)
